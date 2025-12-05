@@ -1,0 +1,26 @@
+{
+    "manifest_version": 3,
+    "name": "치지직 채팅 내보내기",
+    "version": "1.0.0",
+    "description": "치지직 방송의 채팅을 CSV 파일로 내보냅니다",
+    "permissions": [
+        "storage",
+        "downloads"
+    ],
+    "action": {
+        "default_popup": "popup.html",
+        "default_icon": {
+            "16": "icons/icon16.png",
+            "48": "icons/icon48.png",
+            "128": "icons/icon128.png"
+        }
+    },
+    "background": {
+        "service_worker": "background.js"
+    },
+    "icons": {
+        "16": "icons/icon16.png",
+        "48": "icons/icon48.png",
+        "128": "icons/icon128.png"
+    }
+}

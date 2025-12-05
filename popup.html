@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>치지직 채팅 내보내기</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+  <div class="container">
+    <h1 class="title">치지직 채팅 내보내기</h1>
+
+    <!-- URL Input -->
+    <div class="section">
+      <label for="videoUrl" class="label">치지직 VOD 링크</label>
+      <input type="text" id="videoUrl" class="input" placeholder="https://chzzk.naver.com/video/12345 또는 12345">
+    </div>
+
+    <!-- Time Range (Optional) -->
+    <div class="section">
+      <label class="label">수집 시간 범위 (선택)</label>
+      <div class="time-row">
+        <div class="time-col">
+          <label for="timeStart" class="time-label">시작 시간</label>
+          <input type="text" id="timeStart" class="time-input" placeholder="00:00:00" inputmode="numeric">
+        </div>
+        <div class="time-col">
+          <label for="timeEnd" class="time-label">종료 시간</label>
+          <input type="text" id="timeEnd" class="time-input" placeholder="hh:mm:ss" inputmode="numeric">
+        </div>
+      </div>
+      <div class="hint">예: 00:05:30 (5분 30초) 또는 01:30:00 (1시간 30분)</div>
+    </div>
+
+    <!-- Start Button -->
+    <button id="startBtn" class="btn primary">채팅 수집 시작</button>
+
+    <!-- Progress -->
+    <div class="progress-section" id="progressSection">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+        <span class="progress-text" id="progressText">0%</span>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div id="status" class="status-info">
+      <span id="statusText">대기 중</span>
+    </div>
+
+    <!-- Video Info -->
+    <div id="videoInfo" class="video-info" style="display: none;">
+      <div class="info-row">
+        <span class="info-label">제목:</span>
+        <span id="videoTitle" class="info-value">-</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">채널:</span>
+        <span id="channelName" class="info-value">-</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">수집된 채팅:</span>
+        <span id="chatCount" class="info-value">0</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+
+</html>

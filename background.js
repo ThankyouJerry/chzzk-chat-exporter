@@ -1,22 +1,30 @@
-// Background script for Chzzk Chat Exporter
-// Handles collection requests from popup
+let collectionInProgress = false;
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'startCollection') {
-        // Start collection with given parameters
-        startCollection(request.videoId, request.timeStart, request.timeEnd);
+        if (collectionInProgress) {
+            sendResponse({ success: false, error: '이미 채팅을 수집하고 있습니다.' });
+            return false;
+        }
+
+        collectionInProgress = true;
+        startCollection(request.videoId, request.timeStart, request.timeEnd)
+            .finally(() => {
+                collectionInProgress = false;
+            });
         sendResponse({ success: true });
     }
-    return true;
+    return false;
 });
 
 async function startCollection(videoId, timeStart, timeEnd) {
     try {
-        // Initialize progress
+        await chrome.storage.local.remove('chatData');
         await chrome.storage.local.set({
             collectionProgress: {
                 percent: 0,
                 status: '채팅 수집 시작...',
+                chatCount: 0,
                 isComplete: false
             }
         });
@@ -24,6 +32,9 @@ async function startCollection(videoId, timeStart, timeEnd) {
         // Fetch video metadata
         const metadataUrl = `https://api.chzzk.naver.com/service/v2/videos/${videoId}`;
         const metadataResponse = await fetch(metadataUrl);
+        if (!metadataResponse.ok) {
+            throw new Error(`영상 정보를 가져오지 못했습니다. (${metadataResponse.status})`);
+        }
         const metadataData = await metadataResponse.json();
         const content = metadataData?.content || {};
 
@@ -44,6 +55,7 @@ async function startCollection(videoId, timeStart, timeEnd) {
             collectionProgress: {
                 percent: 0,
                 status: '⚠️ 오류 발생: ' + error.message,
+                chatCount: 0,
                 isComplete: true
             }
         });
@@ -58,11 +70,14 @@ async function fetchChatData(videoId, timeStart, timeEnd, videoInfo) {
     let pageCount = 0;
     const maxPages = 10000;
     const maxEmptyRetry = 3;
+    const maxRequestRetry = 5;
     let emptyRetry = 0;
+    let requestRetry = 0;
+    let reachedEnd = false;
 
     const hasEnd = timeEnd !== null && timeEnd !== undefined;
 
-    while (pageCount < maxPages) {
+    while (pageCount < maxPages && !reachedEnd) {
         const apiUrl = `${baseUrl}?playerMessageTime=${playerMessageTime}`;
 
         try {
@@ -72,9 +87,14 @@ async function fetchChatData(videoId, timeStart, timeEnd, videoInfo) {
                 if (response.status === 404 || response.status === 500) {
                     break;
                 }
+                requestRetry++;
+                if (requestRetry >= maxRequestRetry) {
+                    throw new Error(`채팅 API 요청이 반복해서 실패했습니다. (${response.status})`);
+                }
                 await sleep(500);
                 continue;
             }
+            requestRetry = 0;
 
             const data = await response.json();
             const chats = data?.content?.videoChats || [];
@@ -99,7 +119,7 @@ async function fetchChatData(videoId, timeStart, timeEnd, videoInfo) {
 
                 // Stop if after end time
                 if (hasEnd && pm > timeEnd) {
-                    pageCount = maxPages; // Force stop
+                    reachedEnd = true;
                     break;
                 }
 
@@ -123,7 +143,7 @@ async function fetchChatData(videoId, timeStart, timeEnd, videoInfo) {
                 }
 
                 chatData.push({
-                    timestamp: new Date(pm).toISOString(),
+                    timestamp: formatElapsedTime(pm),
                     userId: nickname,
                     message: message
                 });
@@ -143,17 +163,17 @@ async function fetchChatData(videoId, timeStart, timeEnd, videoInfo) {
             if (hasEnd) {
                 const range = timeEnd - timeStart;
                 const current = lastTime - timeStart;
-                percent = Math.min(100, Math.floor((current / range) * 100));
+                percent = Math.max(0, Math.min(100, Math.floor((current / range) * 100)));
             } else {
                 // Just show that we're making progress
                 percent = Math.min(95, pageCount);
             }
 
             await chrome.storage.local.set({
-                chatData: chatData,
                 collectionProgress: {
                     percent: percent,
                     status: `수집 중... (${chatData.length.toLocaleString()}개)`,
+                    chatCount: chatData.length,
                     isComplete: false
                 }
             });
@@ -162,6 +182,10 @@ async function fetchChatData(videoId, timeStart, timeEnd, videoInfo) {
 
         } catch (error) {
             console.error('Fetch error:', error);
+            requestRetry++;
+            if (requestRetry >= maxRequestRetry) {
+                throw error;
+            }
             await sleep(500);
         }
     }
@@ -171,6 +195,7 @@ async function fetchChatData(videoId, timeStart, timeEnd, videoInfo) {
         collectionProgress: {
             percent: 100,
             status: 'CSV 생성 중...',
+            chatCount: chatData.length,
             isComplete: false
         }
     });
@@ -184,6 +209,7 @@ async function fetchChatData(videoId, timeStart, timeEnd, videoInfo) {
         collectionProgress: {
             percent: 100,
             status: `✅ 완료! (${chatData.length.toLocaleString()}개 메시지)`,
+            chatCount: chatData.length,
             isComplete: true
         }
     });
@@ -281,6 +307,15 @@ function escapeCSV(str) {
         return `"${str.replace(/"/g, '""')}"`;
     }
     return str;
+}
+
+function formatElapsedTime(milliseconds) {
+    const total = Math.max(0, Number(milliseconds) || 0);
+    const hours = Math.floor(total / 3600000);
+    const minutes = Math.floor((total % 3600000) / 60000);
+    const seconds = Math.floor((total % 60000) / 1000);
+    const millis = Math.floor(total % 1000);
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
 }
 
 function sleep(ms) {

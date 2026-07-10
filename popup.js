@@ -40,12 +40,14 @@ function parseTimeToMs(timeStr) {
     if (!timeStr || !timeStr.trim()) return null;
 
     const parts = timeStr.trim().split(':').map(Number);
-    if (parts.some(n => isNaN(n))) return null;
+    if (parts.length > 3 || parts.some(n => !Number.isFinite(n) || n < 0)) return null;
 
     let h = 0, m = 0, s = 0;
     if (parts.length === 3) [h, m, s] = parts;
     else if (parts.length === 2) [m, s] = parts;
-    else[s] = parts;
+    else [s] = parts;
+
+    if (m >= 60 || s >= 60) return null;
 
     return ((h * 3600) + (m * 60) + s) * 1000;
 }
@@ -85,9 +87,18 @@ startBtn.addEventListener('click', async () => {
         return;
     }
 
-    // Parse time range
+    const startRaw = timeStartInput.value.trim();
+    const endRaw = timeEndInput.value.trim();
     const timeStart = parseTimeToMs(timeStartInput.value) || 0;
     const timeEnd = parseTimeToMs(timeEndInput.value);
+    if ((startRaw && parseTimeToMs(startRaw) === null) || (endRaw && timeEnd === null)) {
+        updateStatus('error', '⚠️ 시간은 HH:MM:SS 형식으로 입력하세요');
+        return;
+    }
+    if (timeEnd !== null && timeEnd <= timeStart) {
+        updateStatus('error', '⚠️ 종료 시간은 시작 시간보다 뒤여야 합니다');
+        return;
+    }
 
     // Save URL for next time
     await chrome.storage.local.set({ lastUrl: input });
@@ -111,7 +122,7 @@ startBtn.addEventListener('click', async () => {
             // Start polling for progress
             startPolling();
         } else {
-            updateStatus('error', '⚠️ 수집 시작 실패');
+            updateStatus('error', `⚠️ ${response?.error || '수집 시작 실패'}`);
             startBtn.disabled = false;
             isCollecting = false;
         }
@@ -129,10 +140,10 @@ let pollingInterval = null;
 function startPolling() {
     pollingInterval = setInterval(async () => {
         try {
-            const result = await chrome.storage.local.get(['collectionProgress', 'videoInfo', 'chatData']);
+            const result = await chrome.storage.local.get(['collectionProgress', 'videoInfo']);
 
             if (result.collectionProgress) {
-                const { percent, status, isComplete } = result.collectionProgress;
+                const { percent, status, chatCount: collectedCount = 0, isComplete } = result.collectionProgress;
 
                 // Update progress bar
                 progressFill.style.width = `${percent}%`;
@@ -150,10 +161,7 @@ function startPolling() {
                     channelName.textContent = result.videoInfo.channelName || '-';
                 }
 
-                // Update chat count
-                if (result.chatData) {
-                    chatCount.textContent = result.chatData.length.toLocaleString();
-                }
+                chatCount.textContent = collectedCount.toLocaleString();
 
                 // Check if complete
                 if (isComplete) {

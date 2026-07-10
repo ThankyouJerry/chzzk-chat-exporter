@@ -1,11 +1,15 @@
 {
     "manifest_version": 3,
     "name": "치지직 채팅 내보내기",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "치지직 방송의 채팅을 CSV 파일로 내보냅니다",
+    "author": "ThankyouJerry",
     "permissions": [
         "storage",
         "downloads"
+    ],
+    "host_permissions": [
+        "https://api.chzzk.naver.com/*"
     ],
     "action": {
         "default_popup": "popup.html",
